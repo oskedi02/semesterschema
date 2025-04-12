@@ -1,0 +1,16 @@
+#table-wrapper {
+    max-height: 500px;
+    overflow-y: auto; /* Vertikal scrollning */
+    overflow-x: auto; /* Horisontell scrollning */
+    position: relative;
+}
+
+.table {
+    white-space: nowrap; /* Förhindra radbrytning på kolumner */
+}
+ /* Gör att namnen visas på en enda rad */
+    #semester-schema-bootstrap-container td {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
