@@ -34,7 +34,8 @@ function semester_schema_bootstrap_enqueue_scripts() {
     );
     wp_localize_script('semester-schema-bootstrap-js', 'SemesterSchemaSettings', array(
         'restUrl' => rest_url('semester-schema/v1/'),
-        'nonce' => wp_create_nonce('wp_rest')
+        'nonce' => wp_create_nonce('wp_rest'),
+        'currentYear' => date("Y") // Pass current year to JavaScript
     ));
 }
 add_action('wp_enqueue_scripts', 'semester_schema_bootstrap_enqueue_scripts');
@@ -170,6 +171,7 @@ add_shortcode('semester_schema_bootstrap', 'semester_schema_bootstrap_shortcode'
 
 // Shortcode to display only the control panel
 function semester_schema_control_panel_shortcode() {
+    $currentYear = date("Y");
     return '
         <div id="sticky-controls" style="position: relative; display: flex; align-items: center; padding: 10px; gap: 10px; border-bottom: 1px solid #ddd; background: white;">
             <button class="btn btn-primary btn-sm" id="prevMonth">Föregående månad</button>
@@ -196,6 +198,15 @@ function semester_schema_control_panel_shortcode() {
                     ' . implode('', array_map(function($week) {
                         return "<option value=\"$week\">Vecka $week</option>";
                     }, range(1, 52))) . '
+                </select>
+            </div>
+            <div>
+                <label for="year-select" style="display: block;">Välj år:</label>
+                <select id="year-select" class="form-select form-select-sm">
+                    ' . implode('', array_map(function($year) use ($currentYear) {
+                        $selected = ($year == $currentYear) ? 'selected' : '';
+                        return "<option value=\"$year\" $selected>$year</option>";
+                    }, range($currentYear - 3, $currentYear + 3))) . '
                 </select>
             </div>
             <button class="btn btn-primary btn-sm" id="nextMonth">Nästa månad</button>
