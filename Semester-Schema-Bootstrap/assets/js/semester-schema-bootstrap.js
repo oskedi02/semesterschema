@@ -22,13 +22,50 @@ document.addEventListener('DOMContentLoaded', function () {
         '': '#FFFFFF' // Blank cell
     };
 
+    const dayColors = {
+        weekday: '#EAF6FF', // Ljusblå för vardagar
+        weekend: '#FFEBE6', // Ljus röd för helger och helgdagar
+        holiday: '#FFEBE6' // Samma färg för helgdagar
+    };
+
     const swedishMonths = [
         'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
         'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
     ];
 
-    const swedishWeekdays = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
+    const swedishWeekdays = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre'];
 
+    // Sveriges helgdagar för 2025
+    const publicHolidays = {
+        "2025-01-01": "Nyårsdagen",
+        "2025-01-06": "Trettondedag jul",
+        "2025-04-18": "Långfredagen",
+        "2025-04-20": "Påskdagen",
+        "2025-04-21": "Annandag påsk",
+        "2025-05-01": "Första maj",
+        "2025-05-29": "Kristi himmelsfärds dag",
+        "2025-06-06": "Sveriges nationaldag",
+        "2025-06-21": "Midsommardagen",
+        "2025-11-01": "Alla helgons dag",
+        "2025-12-25": "Juldagen",
+        "2025-12-26": "Annandag jul"
+    };
+// CSS för att dölja texten i valda dropdown-alternativ
+    const style = document.createElement('style');
+    style.textContent = `
+        .hidden-text-dropdown option {
+            color: black; /* Visa texten normalt för alla alternativ */
+        }
+        .hidden-text-dropdown option:checked {
+            color: transparent; /* Dölj texten för det valda alternativet */
+            text-indent: -9999px; /* Flytta texten bort från synfältet */
+        }
+        .hidden-text-dropdown:hover option,
+        .hidden-text-dropdown:focus option {
+            color: black; /* Visa texten när dropdown är öppen */
+            text-indent: 0; /* Återställ textens position */
+        }
+    `;
     function loadData() {
         console.log('Loading data...');
         Promise.all([
@@ -113,24 +150,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderTable() {
         container.innerHTML = `
-            <div id="table-wrapper" style="overflow-x: auto;">
-                <table class="table table-bordered">
+            <div id="sticky-header" style="position: sticky; top: 0; z-index: 10; background: #d3e4f8; text-align: left; padding: 0 8px; font-weight: bold; height: 36px; line-height: 36px; margin: 0; border-bottom: 1px solid #ccc;">
+                <span id="month-year">${swedishMonths[currentMonth]} ${currentYear}</span>
+            </div>
+            <div id="table-wrapper" style="overflow-x: auto; overflow-y: auto; height: 80vh; margin: 0; padding: 0; box-sizing: border-box;">
+                <table class="table table-bordered" style="margin: 0; border-collapse: collapse; width: 100%;">
                     <thead>
-                        <tr id="month-row"></tr>
-                        <tr id="week-row"></tr>
-                        <tr id="date-row"></tr>
+                        <tr id="week-row" style="position: sticky; top: 0; z-index: 9; background: #E0F7FA; margin: 0; padding: 0; white-space: nowrap; text-align: center; vertical-align: middle;"></tr>
+                        <tr id="date-row" style="position: sticky;font-size: 14px; top: 36px; z-index: 8; background: white; margin: 0; padding: 0; white-space: nowrap; text-align: center; vertical-align: middle;"></tr>
                     </thead>
                     <tbody id="table-body"></tbody>
                 </table>
             </div>
         `;
 
+        const tableWrapper = document.getElementById('table-wrapper');
+        const stickyHeader = document.getElementById('sticky-header');
+
+        // Synkronisera horisontell scroll för "månad och år"
+        tableWrapper.addEventListener('scroll', function () {
+            stickyHeader.style.left = `-${this.scrollLeft}px`;
+        });
+
         updateTable(currentMonth, currentYear); // Ladda initial data
     }
 
     function updateTable(month, year) {
-        console.log(`Updating table for month: ${month}, year: ${year}`);
-        const monthRow = document.getElementById('month-row');
         const weekRow = document.getElementById('week-row');
         const dateRow = document.getElementById('date-row');
         const tableBody = document.getElementById('table-body');
@@ -140,25 +185,19 @@ document.addEventListener('DOMContentLoaded', function () {
             const date = new Date(year, month, i + 1);
             const dateString = date.toISOString().split('T')[0];
             const weekdayIndex = (date.getDay() + 6) % 7; // Gör måndag till första dagen
+            const isHoliday = publicHolidays[dateString] || null;
             return {
                 fullDate: dateString,
                 day: date.getDate(),
                 week: getWeekNumber(date),
                 monthName: swedishMonths[month],
                 weekday: swedishWeekdays[weekdayIndex],
-                isWeekend: weekdayIndex >= 5 // Lördag och söndag
+                isWeekend: weekdayIndex >= 5, // Lördag och söndag
+                isHoliday
             };
-        });
+        }).filter(day => !day.isWeekend); // Filtrera bort helger (lördagar och söndagar)
 
-        // Uppdatera månadsraden
-        monthRow.innerHTML = `
-            <th style="position: sticky; left: 0; top: 0; background: #d3e4f8; z-index: 3; white-space: nowrap; font-weight: bold;" colspan="${days.length + 1}">
-                ${days[0]?.monthName || ''}
-            </th>
-        `;
-
-        // Uppdatera veckoraden
-        weekRow.innerHTML = `<th style="position: sticky; left: 0; top: 36px; background: #E0F7FA; z-index: 2;">Vecka</th>`;
+        weekRow.innerHTML = `<th style="position: sticky; left: 0; background: #E0F7FA;">Vecka</th>`;
         let currentWeek = days[0]?.week;
         let weekStartIndex = 0;
         for (let i = 0; i <= days.length; i++) {
@@ -172,14 +211,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        // Uppdatera datumraden
-        dateRow.innerHTML = `<th style="position: sticky; left: 0; top: 72px; background: white; z-index: 1;">Datum</th>`;
+        dateRow.innerHTML = `<th style="position: sticky; left: 0; background: white;">Datum</th>`;
         days.forEach(day => {
-            const bgColor = day.isWeekend ? '#FFEBE6' : '#EAF6FF';
-            dateRow.innerHTML += `<th class="text-center" style="background: ${bgColor};">${day.weekday} ${day.day}</th>`;
+            const bgColor = day.isHoliday ? dayColors.holiday : dayColors.weekday;
+            const content = day.isHoliday ? day.isHoliday : `${day.weekday} ${day.day}`;
+            dateRow.innerHTML += `<th class="text-center" style="background: ${bgColor};">${content}</th>`;
         });
 
-        // Uppdatera tabellens rader
         tableBody.innerHTML = '';
         users.forEach(user => {
             const tr = document.createElement('tr');
@@ -193,16 +231,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
             days.forEach(day => {
                 const td = document.createElement('td');
-                const status = scheduleData[user]?.[day.fullDate] || '';
-                td.innerHTML = `<select class="form-select form-select-sm" style="min-width: 100%; background-color: ${colors[status]};">
-                    ${statuses.map(s => `<option value="${s}" ${s === status ? 'selected' : ''} style="background-color: ${colors[s]}">${s || '-'}</option>`).join('')}
-                </select>`;
-                td.querySelector('select').addEventListener('change', function () {
-                    const newStatus = this.value;
-                    td.style.backgroundColor = colors[newStatus];
-                    this.style.backgroundColor = colors[newStatus];
-                    saveData(user, day.fullDate, newStatus);
-                });
+                if (day.isHoliday) {
+                    td.textContent = "Ledig"; // Visa "Ledig" för helgdagar
+                    td.style.backgroundColor = dayColors.holiday;
+                    td.style.textAlign = 'center';
+                } else {
+                    const status = scheduleData[user]?.[day.fullDate] || '';
+                    td.innerHTML = `
+                        <select class="form-select form-select-sm hidden-text-dropdown" style="width: 100%; height: 100%; background-color: ${colors[status]};">
+                            ${statuses.map(s => `<option value="${s}" ${s === status ? 'selected' : ''} style="background-color: ${colors[s]}">${s || '-'}</option>`).join('')}
+                        </select>`;
+                    const selectElement = td.querySelector('select');
+
+                    if (status) {
+                        selectElement.classList.add('text-hidden');
+                    }
+
+                    selectElement.addEventListener('change', function () {
+                        const newStatus = this.value;
+                        td.style.backgroundColor = colors[newStatus];
+                        this.style.backgroundColor = colors[newStatus];
+                        this.classList.add('text-hidden');
+                        saveData(user, day.fullDate, newStatus);
+                    });
+                }
                 tr.appendChild(td);
             });
 
@@ -215,9 +267,7 @@ document.addEventListener('DOMContentLoaded', function () {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-WP-Nonce': SemesterSchemaSettings.nonce
-            },
-            body: JSON.stringify({ person, datum, status })
+                'X-WP-Nonce': SemesterSchemaSettings.nonce }
         })
         .then(res => {
             if (!res.ok) {
