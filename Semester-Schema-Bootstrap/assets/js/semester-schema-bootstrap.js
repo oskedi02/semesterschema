@@ -9,8 +9,9 @@ document.addEventListener('DOMContentLoaded', function () {
     let scheduleData = {};
     let users = [];
     let currentMonth = 0; // Startar från januari (0 = januari, 11 = december)
+    let currentYear = new Date().getFullYear(); // Innevarande år
 
-    const statuses = ['Semester', 'Föräldraledig', 'Tjänstledig', 'Preliminär semester', 'Flexledig', 'Vakant'];
+    const statuses = ['', 'Semester', 'Föräldraledig', 'Tjänstledig', 'Preliminär semester', 'Flexledig', 'Vakant'];
     const colors = {
         'Semester': '#4CAF50',
         'Föräldraledig': '#F48FB1',
@@ -21,32 +22,12 @@ document.addEventListener('DOMContentLoaded', function () {
         '': '#FFFFFF' // Blank cell
     };
 
-    const dayColors = {
-        weekday: '#EAF6FF', // Ljusblå för vardagar
-        weekend: '#FFEBE6' // Ljus röd för helger och helgdagar
-    };
-
     const swedishMonths = [
         'Januari', 'Februari', 'Mars', 'April', 'Maj', 'Juni',
         'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
     ];
 
     const swedishWeekdays = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
-
-    const publicHolidays = {
-        "2025-01-01": "Nyårsdagen",
-        "2025-01-06": "Trettondedag jul",
-        "2025-04-18": "Långfredagen",
-        "2025-04-20": "Påskdagen",
-        "2025-04-21": "Annandag påsk",
-        "2025-05-01": "Första maj",
-        "2025-05-29": "Kristi himmelsfärds dag",
-        "2025-06-06": "Sveriges nationaldag",
-        "2025-06-22": "Midsommardagen",
-        "2025-11-01": "Alla helgons dag",
-        "2025-12-25": "Juldagen",
-        "2025-12-26": "Annandag jul"
-    };
 
     function loadData() {
         console.log('Loading data...');
@@ -90,11 +71,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const weekSelect = document.getElementById('week-select');
         const prevMonthButton = document.getElementById('prevMonth');
         const nextMonthButton = document.getElementById('nextMonth');
+        const yearSelect = document.getElementById('year-select');
 
         // Uppdatera tabellen när månads-väljaren ändras
         monthSelect.addEventListener('change', function () {
             currentMonth = parseInt(monthSelect.value, 10);
-            updateTable(currentMonth);
+            updateTable(currentMonth, currentYear);
         });
 
         // Uppdatera tabellen när veckoväljaren ändras och scrolla till vald vecka
@@ -108,7 +90,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (currentMonth > 0) {
                 currentMonth--;
                 monthSelect.value = currentMonth; // Sync dropdown
-                updateTable(currentMonth);
+                updateTable(currentMonth, currentYear);
             }
         });
 
@@ -117,8 +99,15 @@ document.addEventListener('DOMContentLoaded', function () {
             if (currentMonth < 11) {
                 currentMonth++;
                 monthSelect.value = currentMonth; // Sync dropdown
-                updateTable(currentMonth);
+                updateTable(currentMonth, currentYear);
             }
+        });
+
+        // Uppdatera tabellen när årsväljaren ändras
+        yearSelect.addEventListener('change', function () {
+            currentYear = parseInt(yearSelect.value, 10);
+            console.log(`Updating table for year: ${currentYear}`);
+            updateTable(currentMonth, currentYear);
         });
     }
 
@@ -136,11 +125,11 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         `;
 
-        updateTable(currentMonth); // Ladda initial data
+        updateTable(currentMonth, currentYear); // Ladda initial data
     }
 
-    function updateTable(month) {
-        const year = 2025;
+    function updateTable(month, year) {
+        console.log(`Updating table for month: ${month}, year: ${year}`);
         const monthRow = document.getElementById('month-row');
         const weekRow = document.getElementById('week-row');
         const dateRow = document.getElementById('date-row');
@@ -157,10 +146,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 week: getWeekNumber(date),
                 monthName: swedishMonths[month],
                 weekday: swedishWeekdays[weekdayIndex],
-                isWeekend: weekdayIndex >= 5, // Lördag och söndag
-                isHoliday: publicHolidays[dateString] || null // Holiday name if it exists
+                isWeekend: weekdayIndex >= 5 // Lördag och söndag
             };
-        }).filter(day => !day.isWeekend); // Filtrera bort helger (lördag och söndag)
+        });
 
         // Uppdatera månadsraden
         monthRow.innerHTML = `
@@ -170,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function () {
         `;
 
         // Uppdatera veckoraden
-        weekRow.innerHTML = `<th style="position: sticky; left: 0; top: 36px; background: #E0F7FA; z-index: 2; font-weight: bold;">Vecka</th>`;
+        weekRow.innerHTML = `<th style="position: sticky; left: 0; top: 36px; background: #E0F7FA; z-index: 2;">Vecka</th>`;
         let currentWeek = days[0]?.week;
         let weekStartIndex = 0;
         for (let i = 0; i <= days.length; i++) {
@@ -187,11 +175,8 @@ document.addEventListener('DOMContentLoaded', function () {
         // Uppdatera datumraden
         dateRow.innerHTML = `<th style="position: sticky; left: 0; top: 72px; background: white; z-index: 1;">Datum</th>`;
         days.forEach(day => {
-            const bgColor = day.isHoliday ? dayColors.weekend : dayColors.weekday;
-            const content = day.isHoliday ? `<span>${day.isHoliday}</span>` : `${day.weekday} ${day.day}/${month + 1}`;
-            dateRow.innerHTML += `<th class="text-center" style="min-width: 100px; background: ${bgColor};">
-                ${content}
-            </th>`;
+            const bgColor = day.isWeekend ? '#FFEBE6' : '#EAF6FF';
+            dateRow.innerHTML += `<th class="text-center" style="background: ${bgColor};">${day.weekday} ${day.day}</th>`;
         });
 
         // Uppdatera tabellens rader
@@ -203,25 +188,21 @@ document.addEventListener('DOMContentLoaded', function () {
             nameCell.style.position = 'sticky';
             nameCell.style.left = '0';
             nameCell.style.background = 'white';
-            nameCell.style.whiteSpace = 'nowrap'; // Förhindra radbryt
+            nameCell.style.whiteSpace = 'nowrap';
             tr.appendChild(nameCell);
 
             days.forEach(day => {
                 const td = document.createElement('td');
-                if (day.isHoliday) {
-                    td.textContent = day.isHoliday;
-                    td.style.backgroundColor = dayColors.weekend;
-                    td.style.textAlign = 'center';
-                } else {
-                    const status = scheduleData[user]?.[day.fullDate] || '';
-                    td.style.backgroundColor = colors[status];
-                    td.innerHTML = `
-                        <select class="form-select form-select-sm" data-person="${user}" data-date="${day.fullDate}" style="min-width: 100px; background-color: ${colors[status]};">
-                            <option value="" ${status === '' ? 'selected' : ''}>-</option>
-                            ${statuses.map(s => `<option value="${s}" ${s === status ? 'selected' : ''} style="background-color: ${colors[s]};">${s}</option>`).join('')}
-                        </select>
-                    `;
-                }
+                const status = scheduleData[user]?.[day.fullDate] || '';
+                td.innerHTML = `<select class="form-select form-select-sm" style="min-width: 100%; background-color: ${colors[status]};">
+                    ${statuses.map(s => `<option value="${s}" ${s === status ? 'selected' : ''} style="background-color: ${colors[s]}">${s || '-'}</option>`).join('')}
+                </select>`;
+                td.querySelector('select').addEventListener('change', function () {
+                    const newStatus = this.value;
+                    td.style.backgroundColor = colors[newStatus];
+                    this.style.backgroundColor = colors[newStatus];
+                    saveData(user, day.fullDate, newStatus);
+                });
                 tr.appendChild(td);
             });
 
@@ -229,15 +210,35 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function saveData(person, datum, status) {
+        fetch(SemesterSchemaSettings.restUrl + 'save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': SemesterSchemaSettings.nonce
+            },
+            body: JSON.stringify({ person, datum, status })
+        })
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`Failed to save data: ${res.statusText}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log('Data saved:', data);
+        })
+        .catch(err => console.error('Error saving data:', err));
+    }
+
     function scrollToWeek(week) {
-        const year = 2025;
         const days = [];
         for (let month = 0; month < 12; month++) {
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInMonth = new Date(currentYear, month + 1, 0).getDate();
             for (let day = 1; day <= daysInMonth; day++) {
-                const date = new Date(year, month, day);
-                const weekdayIndex = (date.getDay() + 6) % 7; // Gör måndag till första dagen
-                if (weekdayIndex < 5) { // Endast vardagar
+                const date = new Date(currentYear, month, day);
+                const weekdayIndex = (date.getDay() + 6) % 7;
+                if (weekdayIndex < 5) {
                     days.push({
                         date,
                         week: getWeekNumber(date),
@@ -247,17 +248,16 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        const targetDay = days.find(day => day.week === week);
+        const targetDay = days.find(d => d.week === week);
         if (targetDay) {
             currentMonth = targetDay.month;
-            document.getElementById('month-select').value = currentMonth; // Sync dropdown
-            updateTable(currentMonth);
+            document.getElementById('month-select').value = currentMonth;
+            updateTable(currentMonth, currentYear);
 
-            // Scrolla till veckan
             const weekCells = Array.from(document.querySelectorAll('#week-row th'));
             const targetCell = weekCells.find(cell => cell.textContent.includes(`Vecka ${week}`));
             if (targetCell) {
-                targetCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetCell.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
     }
@@ -270,6 +270,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
     }
 
-    bindControlPanelEvents(); // Koppla kontrollpanelen till tabellen
+    bindControlPanelEvents();
     loadData();
 });
