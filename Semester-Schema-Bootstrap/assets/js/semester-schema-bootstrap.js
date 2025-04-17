@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let users = [];
     let currentMonth = 0; // Startar från januari (0 = januari, 11 = december)
     let currentYear = new Date().getFullYear(); // Innevarande år
+    let autoPollingInterval = null; // Interval ID for auto-polling
 
     const statuses = ['', 'Semester', 'Föräldraledig', 'Tjänstledig', 'Preliminär semester', 'Flexledig', 'Vakant'];
     const colors = {
@@ -50,7 +51,8 @@ document.addEventListener('DOMContentLoaded', function () {
         "2025-12-25": "Juldagen",
         "2025-12-26": "Annandag jul"
     };
-// CSS för att dölja texten i valda dropdown-alternativ
+
+    // CSS för att dölja texten i valda dropdown-alternativ
     const style = document.createElement('style');
     style.textContent = `
         .hidden-text-dropdown option {
@@ -66,6 +68,8 @@ document.addEventListener('DOMContentLoaded', function () {
             text-indent: 0; /* Återställ textens position */
         }
     `;
+    document.head.appendChild(style);
+
     function loadData() {
         console.log('Loading data...');
         Promise.all([
@@ -97,7 +101,15 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             scheduleData = schedule;
-            users = userList;
+
+            // Filtrera bort användare utan en grupp
+            users = userList
+                .filter(user => user.group && user.group.trim() !== "" && user.group !== "Ingen grupp")
+                .map(user => ({
+                    name: user.name || "Okänd användare", // Använd "name" för användarnamn med fallback
+                    group: user.group // Använd grupp från backend
+                }));
+
             renderTable();
         })
         .catch(err => console.error('Error loading data:', err));
@@ -222,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function () {
         users.forEach(user => {
             const tr = document.createElement('tr');
             const nameCell = document.createElement('td');
-            nameCell.textContent = user;
+            nameCell.innerHTML = `${user.name}<br><small style="font-size: 12px; color: gray;">(${user.group})</small>`;
             nameCell.style.position = 'sticky';
             nameCell.style.left = '0';
             nameCell.style.background = 'white';
@@ -236,23 +248,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     td.style.backgroundColor = dayColors.holiday;
                     td.style.textAlign = 'center';
                 } else {
-                    const status = scheduleData[user]?.[day.fullDate] || '';
+                    const status = scheduleData[user.name]?.[day.fullDate] || '';
                     td.innerHTML = `
                         <select class="form-select form-select-sm hidden-text-dropdown" style="width: 100%; height: 100%; background-color: ${colors[status]};">
                             ${statuses.map(s => `<option value="${s}" ${s === status ? 'selected' : ''} style="background-color: ${colors[s]}">${s || '-'}</option>`).join('')}
                         </select>`;
-                    const selectElement = td.querySelector('select');
-
-                    if (status) {
-                        selectElement.classList.add('text-hidden');
-                    }
-
-                    selectElement.addEventListener('change', function () {
+                    td.querySelector('select').addEventListener('change', function () {
                         const newStatus = this.value;
                         td.style.backgroundColor = colors[newStatus];
                         this.style.backgroundColor = colors[newStatus];
-                        this.classList.add('text-hidden');
-                        saveData(user, day.fullDate, newStatus);
+                        saveData(user.name, day.fullDate, newStatus);
                     });
                 }
                 tr.appendChild(td);
@@ -267,7 +272,8 @@ document.addEventListener('DOMContentLoaded', function () {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-WP-Nonce': SemesterSchemaSettings.nonce }
+                'X-WP-Nonce': SemesterSchemaSettings.nonce },
+            body: JSON.stringify({ person, datum, status })
         })
         .then(res => {
             if (!res.ok) {
@@ -320,6 +326,35 @@ document.addEventListener('DOMContentLoaded', function () {
         return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
     }
 
+    function startAutoPolling() {
+        if (autoPollingInterval) clearInterval(autoPollingInterval);
+
+        autoPollingInterval = setInterval(() => {
+            console.log('Auto-polling for updates...');
+            fetch(SemesterSchemaSettings.restUrl + 'load', {
+                method: 'GET',
+                headers: { 'X-WP-Nonce': SemesterSchemaSettings.nonce }
+            })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`Failed to load updated data: ${res.statusText}`);
+                }
+                return res.json();
+            })
+            .then(updatedSchedule => {
+                console.log('Updated schedule received:', updatedSchedule);
+
+                // Endast rendera om schemat har ändrats
+                if (JSON.stringify(scheduleData) !== JSON.stringify(updatedSchedule)) {
+                    scheduleData = updatedSchedule;
+                    updateTable(currentMonth, currentYear); // Uppdatera tabellen med nya data
+                }
+            })
+            .catch(err => console.error('Error in auto-polling:', err));
+        }, 5000); // Polla var 5:e sekund
+    }
+
     bindControlPanelEvents();
     loadData();
+    startAutoPolling(); // Starta auto-polling direkt efter att data laddats
 });
